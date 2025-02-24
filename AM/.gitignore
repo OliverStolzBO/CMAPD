@@ -3,3 +3,5 @@ oracle/build
 oracle/oracle.cpython*.so
 # PyCharm
 .idea
+__pycache__
+**deleteme**
