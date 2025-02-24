@@ -1,19 +1,19 @@
 import numpy as np
-from oracle.oracle import oracle
+from submodules.cmapd.AM.oracle.oracle import oracle
 from multiprocessing import Pool, cpu_count
-from regression.features_extractor import FeaturesExtractor
-from regression.utils import read_grid, format_grid_for_oracle
-from regression.grid_solver import get_solver
+from submodules.cmapd.AM.regression.features_extractor import FeaturesExtractor
+from submodules.cmapd.AM.regression.utils import read_grid, format_grid_for_oracle
+from submodules.cmapd.AM.regression.grid_solver import get_solver
 from xgboost import XGBRegressor
-from regression.utils import ravel
-from parameters import params
+from submodules.cmapd.AM.regression.utils import ravel
+from submodules.cmapd.AM.parameters import params
 
 # ---GLOBAL VARIABLES---
-grid, grid_size = read_grid(params['environment']['map'])
+grid, grid_size = read_grid(params["environment"]["map"])
 grid = format_grid_for_oracle(grid)
-grid_solver = get_solver(params['environment']['map'])
-#model = XGBRegressor()
-#model.load_model('model.ubj')
+grid_solver = get_solver(params["environment"]["map"])
+# model = XGBRegressor()
+# model.load_model('model.ubj')
 # ----------------------
 
 
@@ -54,6 +54,7 @@ def distance(waypoint: list[list[list[int]]]):
     for elem in waypoint:
         cost += grid_solver.get_waypoints_distance(elem)
     return cost
+
 
 # def predict_costs(waypoints: list[list[list[list[int]]]]):
 #     with Pool(cpu_count()) as pool:

@@ -1,6 +1,6 @@
 # Jacopo Zagoli, 03/02/2023
 from collections import deque
-from AM.regression.utils import read_grid
+from submodules.cmapd.AM.regression.utils import read_grid
 
 
 class BfsNode:
@@ -13,8 +13,8 @@ class BfsNode:
 class GridSolver:
 
     def __init__(self, grid):
-        print('Solving grid...')
-        self.__grid = grid != b'@'
+        print("Solving grid...")
+        self.__grid = grid != b"@"
         self.__distance_table = dict()
         self.__compute_distance()
 
@@ -24,7 +24,9 @@ class GridSolver:
         return forward or reverse
 
     def __is_present(self, from_point, to_point):
-        forward = from_point in self.__distance_table and to_point in self.__distance_table[from_point]
+        forward = (
+            from_point in self.__distance_table and to_point in self.__distance_table[from_point]
+        )
         return forward
 
     def __compute_distance(self):
@@ -82,7 +84,7 @@ class GridSolver:
             return self.__distance_table[from_point_index][to_point_index]
         if self.__is_present(to_point_index, from_point_index):
             return self.__distance_table[to_point_index][from_point_index]
-        raise Exception(f'No path is present from {from_point} to {to_point}')
+        raise Exception(f"No path is present from {from_point} to {to_point}")
 
     def get_waypoints_distance(self, waypoints: list):
         if len(waypoints) == 1:
@@ -92,7 +94,10 @@ class GridSolver:
             path += self.get_distance(waypoints[i], waypoints[i + 1])
         return path
 
+
 solvers = {}
+
+
 def get_solver(grid_name: str):
     if grid_name in solvers:
         return solvers[grid_name]

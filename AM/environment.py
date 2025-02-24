@@ -3,12 +3,12 @@ from math import inf
 
 import torch
 
-from function import parallel_pbs
-from parameters import params
-from regression.grid_solver import get_solver
+from submodules.cmapd.AM.function import parallel_pbs
+from submodules.cmapd.AM.parameters import params
+from submodules.cmapd.AM.regression.grid_solver import get_solver
 
-GRID = params['environment']['map']
-MAX_COLLECTIVE_SIZE = params['environment']['max_collective_size']
+GRID = params["environment"]["map"]
+MAX_COLLECTIVE_SIZE = params["environment"]["max_collective_size"]
 grid_solver = get_solver(GRID)
 
 
@@ -20,17 +20,31 @@ class Collective:
         self.agents = agents
         self.tasks = tasks
 
-        self.indices = torch.empty(
-            self._batch_size, self._num_agents, MAX_COLLECTIVE_SIZE,
-            dtype=torch.long, device=self._device
-        ).fill_(-1) if assignments is None else assignments
+        self.indices = (
+            torch.empty(
+                self._batch_size,
+                self._num_agents,
+                MAX_COLLECTIVE_SIZE,
+                dtype=torch.long,
+                device=self._device,
+            ).fill_(-1)
+            if assignments is None
+            else assignments
+        )
 
         self.paths = torch.cat([agents, agents], dim=-1) if paths is None else paths
 
-        self.waypoints = torch.cat([
-            agents.unsqueeze(2),
-            -torch.ones_like(agents).unsqueeze(2).repeat(1, 1, 2 * MAX_COLLECTIVE_SIZE, 1)
-        ], dim=2) if waypoints is None else waypoints
+        self.waypoints = (
+            torch.cat(
+                [
+                    agents.unsqueeze(2),
+                    -torch.ones_like(agents).unsqueeze(2).repeat(1, 1, 2 * MAX_COLLECTIVE_SIZE, 1),
+                ],
+                dim=2,
+            )
+            if waypoints is None
+            else waypoints
+        )
         self.is_terminal = torch.zeros(self._batch_size, dtype=torch.bool, device=self._device)
 
     def print_assignment(self):
@@ -38,13 +52,13 @@ class Collective:
         agents = self.agents.detach().clone().squeeze()
         tasks = self.tasks.detach().clone().squeeze()
         for a_idx in range(agents.size()[0]):
-            print('§A', tuple(agents[a_idx].tolist()))
+            print("§A", tuple(agents[a_idx].tolist()))
             tasks_of_agent = [tasks[i] for i in assignment[a_idx] if i != -1]
             to_print = []
             for task in tasks_of_agent:
                 to_print.append(tuple(task.tolist()[:2]))
                 to_print.append(tuple(task.tolist()[2:4]))
-            print('§T', to_print)
+            print("§T", to_print)
 
     def _get_paths(self, waypoints, a_idx):
         last_idx = (waypoints[range(self._batch_size), a_idx] != -1).all(dim=-1).sum(dim=-1)
@@ -59,14 +73,20 @@ class Collective:
         a_idx, t_idx = action
 
         insert_idx = (self.indices[range(self._batch_size), a_idx] != -1).sum(dim=-1)
-        insert_idx = torch.where((insert_idx < MAX_COLLECTIVE_SIZE - 1) & (~self.is_terminal),
-                                 insert_idx, torch.empty_like(insert_idx).fill_(-1))
+        insert_idx = torch.where(
+            (insert_idx < MAX_COLLECTIVE_SIZE - 1) & (~self.is_terminal),
+            insert_idx,
+            torch.empty_like(insert_idx).fill_(-1),
+        )
 
         collective = Collective(self.agents, self.tasks)
 
         collective.indices = self.indices.clone()
         collective.indices[range(self._batch_size), a_idx, insert_idx] = torch.where(
-            self.is_terminal, collective.indices[..., -1].gather(-1, a_idx.unsqueeze(-1)).squeeze(), t_idx)
+            self.is_terminal,
+            collective.indices[..., -1].gather(-1, a_idx.unsqueeze(-1)).squeeze(),
+            t_idx,
+        )
 
         collective.waypoints = self.waypoints.clone()
         """
@@ -95,10 +115,13 @@ class Collective:
         """
 
         collective.paths = self.paths.clone()
-        collective.paths[range(self._batch_size), a_idx] = self._get_paths(collective.waypoints, a_idx)
+        collective.paths[range(self._batch_size), a_idx] = self._get_paths(
+            collective.waypoints, a_idx
+        )
 
-        collective.is_terminal = (collective.indices != -1).sum(dim=-1).sum(dim=-1) == (self.tasks != -1).all(
-            dim=-1).sum(dim=-1)
+        collective.is_terminal = (collective.indices != -1).sum(dim=-1).sum(dim=-1) == (
+            self.tasks != -1
+        ).all(dim=-1).sum(dim=-1)
 
         return collective
 
@@ -125,13 +148,19 @@ class Collective:
             pickup = task[0:2].tolist()
             delivery = task[2:4].tolist()
             # get list of all pickup points for the agent
-            tasks_idxes_for_agent = self.indices[batch_idx, a_idx].detach().clone().squeeze().tolist()
-            pickups_for_agent = self._pickup_locations_for_agent(batch_idx, tasks_idxes_for_agent) + [pickup]
+            tasks_idxes_for_agent = (
+                self.indices[batch_idx, a_idx].detach().clone().squeeze().tolist()
+            )
+            pickups_for_agent = self._pickup_locations_for_agent(
+                batch_idx, tasks_idxes_for_agent
+            ) + [pickup]
             # insert pickup and delivery
-            agent_waypoints, pickup_index = _insert_pickup(agent_waypoints, pickup, pickups_for_agent)
+            agent_waypoints, pickup_index = _insert_pickup(
+                agent_waypoints, pickup, pickups_for_agent
+            )
             agent_waypoints = _insert_delivery(agent_waypoints, delivery, pickup_index)
             result_tensor = torch.full((2 * MAX_COLLECTIVE_SIZE + 1, 2), -1)
-            result_tensor[:len(agent_waypoints)] = torch.tensor(agent_waypoints)
+            result_tensor[: len(agent_waypoints)] = torch.tensor(agent_waypoints)
             return result_tensor
 
     def _pickup_locations_for_agent(self, batch_idx, tasks_idxes_for_agent):
@@ -148,7 +177,9 @@ def _waypoints_tensors_to_lists(waypoints):
     result = []
     for w in waypoints:
         w = [[point for point in points if point[0] != -1] for points in w]
-        w = [[[int_value.item() for int_value in tensor] for tensor in sublist] for sublist in w]  # ChatGPT
+        w = [
+            [[int_value.item() for int_value in tensor] for tensor in sublist] for sublist in w
+        ]  # ChatGPT
         result.append(w)
     return result
 
@@ -160,7 +191,7 @@ def _waypoints_respect_capacity(new_waypoints, pickups):
             cum_capacity += 1
         else:
             cum_capacity -= 1
-        if cum_capacity > params['environment']['capacity']:
+        if cum_capacity > params["environment"]["capacity"]:
             return False
     return True
 
@@ -192,16 +223,18 @@ def _insert_delivery(agent_waypoints, delivery, pickup_index):
     return best_waypoints
 
 
-with open(GRID, 'r') as f:
+with open(GRID, "r") as f:
     f.readline()
     grid = [l.strip() for l in f.readlines()]
 
 
 def sample_agents_tasks(n_agents, n_tasks):
-    typecell = {'.': [], 'e': [], '@': []}
+    typecell = {".": [], "e": [], "@": []}
     for i, row in enumerate(grid):
         for j, cell in enumerate(row):
             typecell[cell].append((i, j))
-    random.shuffle(typecell['e'])
-    return ([typecell['e'].pop() for _ in range(n_agents)],
-            [[typecell['e'].pop(), typecell['e'].pop()] for _ in range(n_tasks)])
+    random.shuffle(typecell["e"])
+    return (
+        [typecell["e"].pop() for _ in range(n_agents)],
+        [[typecell["e"].pop(), typecell["e"].pop()] for _ in range(n_tasks)],
+    )

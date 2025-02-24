@@ -1,7 +1,7 @@
 # Jacopo Zagoli, 31/01/2023
-from regression.utils import ravel
-from regression.grid_solver import GridSolver
-from regression.conflicts import ConflictsFinder, Conflict
+from submodules.cmapd.AM.regression.utils import ravel
+from submodules.cmapd.AM.regression.grid_solver import GridSolver
+from submodules.cmapd.AM.regression.conflicts import ConflictsFinder, Conflict
 
 
 class FeaturesExtractor:
