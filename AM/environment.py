@@ -3,17 +3,18 @@ from math import inf
 
 import torch
 
-from submodules.cmapd.AM.function import parallel_pbs
+from submodules.cmapd.AM.function import HelperFunctions
 from submodules.cmapd.AM.parameters import params
 from submodules.cmapd.AM.regression.grid_solver import get_solver
 
 GRID = params["environment"]["map"]
 MAX_COLLECTIVE_SIZE = params["environment"]["max_collective_size"]
-grid_solver = get_solver(GRID)
+grid_solver = None
 
 
 class Collective:
     def __init__(self, agents, tasks, assignments=None, paths=None, waypoints=None):
+        self.helper_functions = HelperFunctions()
         self._batch_size, self._num_agents, _ = agents.size()
         self._device = agents.device
 
@@ -129,7 +130,7 @@ class Collective:
         terminal_indexes = [index for index, terminal in enumerate(self.is_terminal) if terminal]
         waypoints = [self.waypoints[index] for index in terminal_indexes]
         waypoints = _waypoints_tensors_to_lists(waypoints)
-        costs = parallel_pbs(waypoints)
+        costs = self.helper_functions.parallel_pbs(waypoints)
         reward = torch.zeros(self._batch_size, dtype=torch.float, device=self._device)
         for i, cost in enumerate(costs):
             index = terminal_indexes[i]
@@ -197,6 +198,9 @@ def _waypoints_respect_capacity(new_waypoints, pickups):
 
 
 def _insert_pickup(agent_waypoints, pickup, pickups_for_agent):
+    global grid_solver
+    if grid_solver is None:
+        grid_solver = get_solver(GRID)
     # try to insert pickup in every possible position after the first (agent starting point)
     best_waypoints, best_waypoints_cost, pickup_index = None, inf, 0
     for i in range(1, len(agent_waypoints) + 1):
@@ -212,6 +216,10 @@ def _insert_pickup(agent_waypoints, pickup, pickups_for_agent):
 
 
 def _insert_delivery(agent_waypoints, delivery, pickup_index):
+
+    global grid_solver
+    if grid_solver is None:
+        grid_solver = get_solver(GRID)
     # try to insert pickup in every possible position after the pickup
     best_waypoints, best_waypoints_cost = None, inf
     for i in range(pickup_index + 1, len(agent_waypoints) + 1):  # Search after the pickup
