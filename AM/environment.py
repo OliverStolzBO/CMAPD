@@ -237,12 +237,13 @@ with open(GRID, "r") as f:
 
 
 def sample_agents_tasks(n_agents, n_tasks):
-    typecell = {".": [], "e": [], "@": []}
+    typecell = {".": [], "e": [], "s": [], "@": []}
     for i, row in enumerate(grid):
         for j, cell in enumerate(row):
             typecell[cell].append((i, j))
     random.shuffle(typecell["e"])
+    random.shuffle(typecell["s"])
     return (
-        [typecell["e"].pop() for _ in range(n_agents)],
+        [typecell["s"].pop() for _ in range(n_agents)],
         [[typecell["e"].pop(), typecell["e"].pop()] for _ in range(n_tasks)],
     )
