@@ -15,14 +15,18 @@ from pathlib import Path
 def _sample_action(probs, deterministic=False):
     tasks_size = probs.size(2)
     p = probs.flatten(-2)
-    ij = p.argmax(-1) if deterministic else torch.multinomial((p == 0).all(dim=-1, keepdim=True) + p, 1).squeeze()
+    ij = (
+        p.argmax(-1)
+        if deterministic
+        else torch.multinomial((p == 0).all(dim=-1, keepdim=True) + p, 1).squeeze()
+    )
     action = (ij // tasks_size, ij % tasks_size)
     logprob = torch.log(p[range(probs.size(0)), ij])
     return action, logprob
 
 
 def check_output_dir():
-    dir = Path('models')
+    dir = Path("models")
     if not (dir.exists()):
         dir.mkdir()
 
@@ -58,11 +62,11 @@ class Trainer:
     def _generate_assignment_data(self, dataset, policy):
         policy.eval()
 
-        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=4):
+        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=1):
             indices, paths, waypoints = [], [], []
 
-            agents = data['agents'].to(self.device)
-            tasks = data['tasks'].to(self.device)
+            agents = data["agents"].to(self.device)
+            tasks = data["tasks"].to(self.device)
             collective = Collective(agents, tasks)
 
             while not collective.is_terminal.all():
@@ -79,11 +83,20 @@ class Trainer:
             idx = torch.tensor(list(map(random.randrange, num_states)))
 
             dataset.assignments.extend(
-                indices.gather(0, idx.view(1, -1, 1, 1).expand([-1, -1, indices.size(2), indices.size(3)])).squeeze())
+                indices.gather(
+                    0, idx.view(1, -1, 1, 1).expand([-1, -1, indices.size(2), indices.size(3)])
+                ).squeeze()
+            )
             dataset.paths.extend(
-                paths.gather(0, idx.view(1, -1, 1, 1).expand([-1, -1, paths.size(2), paths.size(3)])).squeeze())
+                paths.gather(
+                    0, idx.view(1, -1, 1, 1).expand([-1, -1, paths.size(2), paths.size(3)])
+                ).squeeze()
+            )
             dataset.waypoints.extend(
-                waypoints.gather(0, idx.view(1, -1, 1, 1, 1).expand([-1, -1, *waypoints.size()[2:]])).squeeze())
+                waypoints.gather(
+                    0, idx.view(1, -1, 1, 1, 1).expand([-1, -1, *waypoints.size()[2:]])
+                ).squeeze()
+            )
 
     @torch.no_grad()
     def _rollout(self, tasks, collective, policy, stochastic=False):
@@ -103,9 +116,9 @@ class Trainer:
         baseline.eval()
 
         model_reward = []
-        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=4):
-            agents = data['agents'].to(self.device)
-            tasks = data['tasks'].to(self.device)
+        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=1):
+            agents = data["agents"].to(self.device)
+            tasks = data["tasks"].to(self.device)
             collective = Collective(agents, tasks)
             reward = self._rollout(tasks, collective, model)
             model_reward.extend(reward.tolist())
@@ -116,14 +129,14 @@ class Trainer:
         model.train()  # sets module in training mode
 
         self._generate_assignment_data(dataset, self.baseline)
-        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=4, shuffle=True):
+        for data in DataLoader(dataset, batch_size=self.batch_size, num_workers=1, shuffle=True):
             self.optim.zero_grad()
 
-            agents = data['agents'].to(self.device)
-            tasks = data['tasks'].to(self.device)
-            assignments = data['assignments'].to(self.device)
-            paths = data['paths'].to(self.device)
-            waypoints = data['waypoints'].to(self.device)
+            agents = data["agents"].to(self.device)
+            tasks = data["tasks"].to(self.device)
+            assignments = data["assignments"].to(self.device)
+            paths = data["paths"].to(self.device)
+            waypoints = data["waypoints"].to(self.device)
 
             collective = Collective(agents, tasks, assignments, paths, waypoints)
 
@@ -136,7 +149,9 @@ class Trainer:
                 probs = self.baseline(tasks, collective)
                 action, _ = _sample_action(probs, deterministic=True)
                 next_collective = collective.add_participant(action)
-                baseline_reward = self._rollout(tasks, next_collective, self.baseline, stochastic=True)
+                baseline_reward = self._rollout(
+                    tasks, next_collective, self.baseline, stochastic=True
+                )
 
             advantage = model_reward - baseline_reward
             loss = (advantage * logprob).mean()
@@ -147,7 +162,7 @@ class Trainer:
             for bp, mp in zip(self.baseline.parameters(), self.model.parameters()):
                 bp.data.copy_(0.01 * mp.data + (1 - 0.01) * bp.data)
 
-    def train(self, n_agents, n_tasks, train_size, eval_size, n_epochs, output_name, log_prefix=''):
+    def train(self, n_agents, n_tasks, train_size, eval_size, n_epochs, output_name, log_prefix=""):
         best = float("inf")
         durations = []
         check_output_dir()
@@ -160,12 +175,12 @@ class Trainer:
             model_reward = self._evaluation(dataset_eval, self.model, self.baseline)
             if model_reward < best:
                 best = model_reward
-                torch.save(self.model.state_dict(), Path('models') / (output_name+'.pth'))
+                torch.save(self.model.state_dict(), Path("models") / (output_name + ".pth"))
             stop = timer()
             duration = stop - start
             durations.append(duration)
             eta = (sum(durations) / len(durations)) * (n_epochs - (epoch + 1))
             logger.info(
-                f'epoch {epoch:5}, time={timedelta(seconds=duration)}, eta={timedelta(seconds=eta)}, reward={model_reward:5}'
+                f"epoch {epoch:5}, time={timedelta(seconds=duration)}, eta={timedelta(seconds=eta)}, reward={model_reward:5}"
             )
         logger.info("End of training. Best reward: " + str(best))

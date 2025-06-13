@@ -50,12 +50,12 @@ class HelperFunctions:
         """
         waypoints: a list of waypoint, that is, a list of list of point, that is, a list of int of length 2
         """
-        with Pool(cpu_count()) as pool:
+        with Pool(4) as pool:
             iterator_results = pool.map(self.characteristic_function, waypoints)
         return list(iterator_results)
 
     def parallel_distance(self, waypoints: list[list[list[list[int]]]]):
-        with Pool(cpu_count()) as pool:
+        with Pool(4) as pool:
             iterator_results = pool.map(self.distance, waypoints)
         return list(iterator_results)
 
